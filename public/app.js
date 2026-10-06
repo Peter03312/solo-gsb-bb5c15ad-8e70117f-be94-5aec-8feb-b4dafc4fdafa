@@ -700,6 +700,12 @@ async function saveCue(cue) {
     state.edits.delete(cue.id);
     renderSubtitles();
     loadComments();
+    // 源字幕文本/时间保存后，译文已在同事务被置为待复核：重新读取当前语言视图，
+    // 立即更新该行待复核状态、源字幕版本与可用操作；失败则提示错误。
+    if (state.trLang) {
+      const ok = await loadTranslation(state.trLang);
+      if (!ok) return;
+    }
     toast(`字幕 #${cue.idx + 1} 已保存（v${body.subtitle.version}）`);
   } else if (status === 409) {
     toast(body.error + '，已刷新当前内容', true);
@@ -861,14 +867,15 @@ async function newProject() {
 
 async function loadTranslation(lang) {
   const p = state.project;
-  if (!p || !lang) return;
+  if (!p || !lang) return false;
   const { status, body } = await api(`/api/projects/${p.id}/translations/${encodeURIComponent(lang)}`);
-  if (status !== 200) { toast(body?.error || '加载译文失败', true); return; }
+  if (status !== 200) { toast(body?.error || '加载译文失败', true); return false; }
   state.trLang = lang;
   state.trView = body;
   $('#tr-lang').value = lang;
   renderTranslations();
   loadGlossary();
+  return true;
 }
 
 function trStateTag(stateName, valid) {
